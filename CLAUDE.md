@@ -130,9 +130,9 @@ Push notifications son clave para alertas de caducidad.
 - [x] `.env.local` configurado (Supabase + OpenRouter + Stripe)
 
 ### Pendiente
-- [ ] PWA config (manifest + service worker + push notifications)
-- [ ] Auth UI (login + registro + Google OAuth + callback)
-- [ ] Layout shell mobile-first (Header, Nav bottom, Shell)
+- [x] PWA config (manifest + service worker — `@ducanh2912/next-pwa`)
+- [x] Auth UI (login + registro + Google OAuth + callback /auth/callback)
+- [x] Layout shell mobile-first (Header, BottomNav, AppShell)
 - [ ] CRUD productos
 - [ ] Dashboard con alertas de caducidad
 - [ ] Gamificación (FreskoPoints + rachas + badges)

@@ -43,6 +43,34 @@
 
 ---
 
+## [2026-04-13] next-pwa webpack config conflicto con Next.js 16 Turbopack
+
+**Síntoma:** `pnpm build` falla con "This build is using Turbopack, with a webpack config and no turbopack config."
+
+**Causa:** `@ducanh2912/next-pwa` inyecta configuración webpack; Next.js 16 usa Turbopack por defecto y lo rechaza sin `turbopack: {}` declarado.
+
+**Solución:** Añadir `turbopack: {}` en `next.config.ts` para indicar explícitamente que se acepta la coexistencia.
+
+**Archivos afectados:** `next.config.ts`
+
+**Tags:** #nextjs16 #pwa #turbopack
+
+---
+
+## [2026-04-13] middleware.ts deprecado en Next.js 16 — renombrar a proxy.ts
+
+**Síntoma:** Warning en dev: "The 'middleware' file convention is deprecated. Please use 'proxy' instead." Build falla con "Proxy is missing expected function export name".
+
+**Causa:** Next.js 16 renombra la convención `middleware.ts` → `proxy.ts` y la función exportada `middleware` → `proxy`.
+
+**Solución:** Renombrar archivo a `src/proxy.ts` y renombrar la función exportada de `middleware` a `proxy`.
+
+**Archivos afectados:** `src/proxy.ts` (antes `src/middleware.ts`)
+
+**Tags:** #nextjs16 #proxy #breaking-change
+
+---
+
 ## [2026-04-08] VSCode abría la carpeta vacía en C: en lugar del proyecto en D:
 
 **Síntoma:** El proyecto no aparecía en VSCode — la carpeta abierta estaba vacía.
