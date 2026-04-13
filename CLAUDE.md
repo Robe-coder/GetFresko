@@ -102,9 +102,21 @@ Configuradas en `.env.local` (no commitear). Ver `.env.local.example`.
 
 ---
 
-## Semana actual del roadmap
+## Estrategia de plataforma
 
-**Semana 1 — Core Funcional** (en progreso)
+**Orden de lanzamiento decidido por el usuario:**
+1. **PWA** (Progressive Web App) — primera prioridad, instalable en iOS/Android desde el navegador
+2. **Web** — misma codebase, responsive
+3. **Native app** (Capacitor) — Post-MVP, solo si PWA valida el producto
+
+La PWA usa Next.js + `@ducanh2912/next-pwa` (service worker, manifest, push notifications).
+Push notifications son clave para alertas de caducidad.
+
+---
+
+## Estado del proyecto
+
+### Hecho
 - [x] Scaffold Next.js + dependencias instaladas
 - [x] Estructura de carpetas creada
 - [x] Tipos TypeScript globales (`src/types/index.ts`)
@@ -113,11 +125,32 @@ Configuradas en `.env.local` (no commitear). Ver `.env.local.example`.
 - [x] Cliente AI OpenRouter (`src/lib/ai.ts`)
 - [x] Middleware auth + premium guard
 - [x] Schema SQL completo con RLS y seed
-- [x] Documentación inicial (CLAUDE.md, PROBLEMS.md, ROADMAP.md, ARCHITECTURE.md)
-- [x] Repo GitHub creado y primer commit pusheado
-- [ ] Auth UI (login + registro con email y Google OAuth)
-- [ ] Layout mobile-first base (Header, Nav, Shell)
+- [x] Documentación inicial
+- [x] Repo GitHub creado y pusheado
+- [x] `.env.local` configurado (Supabase + OpenRouter + Stripe)
+
+### Pendiente
+- [ ] PWA config (manifest + service worker + push notifications)
+- [ ] Auth UI (login + registro + Google OAuth + callback)
+- [ ] Layout shell mobile-first (Header, Nav bottom, Shell)
 - [ ] CRUD productos
+- [ ] Dashboard con alertas de caducidad
+- [ ] Gamificación (FreskoPoints + rachas + badges)
+- [ ] Generador de recetas con caché SHA-256
+- [ ] OCR de tickets
+- [ ] Stripe (checkout + webhooks + guards premium)
+- [ ] Deploy Vercel
+
+---
+
+## IMPORTANTE — Ruta del proyecto
+
+El proyecto vive en **`D:\GetFresko`**. Existe una carpeta vacía en `C:\Users\user\GetFresko` que hay que ignorar.
+
+- Claude Code debe abrirse desde `D:\GetFresko`
+- VSCode: `File → Open Folder → D:\GetFresko`
+- pnpm store configurado en `D:\.pnpm-store` (C: está lleno)
+- Al instalar paquetes usar siempre: `TEMP="/d/tmp" TMP="/d/tmp" TMPDIR="/d/tmp" pnpm add ...`
 
 ---
 
@@ -127,14 +160,19 @@ Configuradas en `.env.local` (no commitear). Ver `.env.local.example`.
 - **Branch principal:** main
 - **Convención de commits:** `tipo: descripción corta` (feat, fix, docs, chore, refactor)
 - **Política:** commit + push al final de cada sesión de trabajo
+- **Documentación:** actualizar CLAUDE.md, PROBLEMS.md y ROADMAP.md al final de cada sesión sin que el usuario lo pida
 
 ---
 
 ## Contexto de sesiones anteriores
 
-### Sesión 1 — 2026-04-07
-- Setup completo del proyecto
-- Problemas con disco C: lleno → trabajar siempre en `D:\GetFresko`
-- `create-next-app` rechaza nombres con mayúsculas → scaffold en tmp y mover a D:
-- Dependencias instaladas: supabase, tanstack-query, zod, anthropic sdk, stripe
+### Sesión 1 — 2026-04-07 / 2026-04-08
+- Setup completo del proyecto en `D:\GetFresko`
+- C: lleno → pnpm store movido a `D:\.pnpm-store`; instalar paquetes con `TEMP="/d/tmp" pnpm add ...`
+- `create-next-app` rechaza nombres con mayúsculas → scaffold en /tmp y mover a D:
+- Dependencias instaladas: supabase, tanstack-query, zod, anthropic sdk, stripe, clsx, tailwind-merge
+- VSCode tenía abierta `C:\Users\user\GetFresko` (vacía) → abrir siempre `D:\GetFresko`
+- Supabase: proyecto creado, pendiente de pasar credenciales para crear `.env.local`
+- GitHub: repo pendiente de crear (necesita `gh auth login`)
+- **Próxima sesión:** pasar credenciales Supabase + hacer gh auth + construir todo (auth UI, layout, CRUD, IA, Stripe)
 - Ver `docs/PROBLEMS.md` para detalles completos

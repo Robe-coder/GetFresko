@@ -42,3 +42,15 @@
 **Tags:** #setup #disk-space #windows
 
 ---
+
+## [2026-04-08] VSCode abría la carpeta vacía en C: en lugar del proyecto en D:
+
+**Síntoma:** El proyecto no aparecía en VSCode — la carpeta abierta estaba vacía.
+
+**Causa:** Había dos carpetas `GetFresko`: una vacía en `C:\Users\user\GetFresko` (la que Claude Code tenía como working directory por defecto) y el proyecto real en `D:\GetFresko`.
+
+**Solución:** En VSCode usar `File → Open Folder` y seleccionar `D:\GetFresko`. Para las próximas sesiones de Claude Code, asegurarse de abrirlo desde `D:\GetFresko`.
+
+**Tags:** #setup #vscode #windows
+
+---
