@@ -113,6 +113,20 @@
 
 ---
 
+## [2026-04-16] removedIndices bloqueaba el botón de añadir tras eliminar productos con clarificación pendiente
+
+**Síntoma:** Al pulsar la X en un producto con nombre truncado/ambiguo, el botón "Añadir" seguía bloqueado porque `needsClarification` incluía el producto eliminado.
+
+**Causa:** `needsClarification` se calculaba sobre `foodProducts` sin filtrar `removedIndices`, así que los productos eliminados seguían contando como "pendientes de aclaración".
+
+**Solución:** Filtrar `removedIndices` en el cálculo de `needsClarification` y derivar `activeFood` (productos visibles) para los contadores del header y botón de añadir.
+
+**Archivos afectados:** `src/app/(app)/productos/escanear/TicketScanner.tsx`
+
+**Tags:** #ocr #ux #state
+
+---
+
 ## [2026-04-08] VSCode abría la carpeta vacía en C: en lugar del proyecto en D:
 
 **Síntoma:** El proyecto no aparecía en VSCode — la carpeta abierta estaba vacía.

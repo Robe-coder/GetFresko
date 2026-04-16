@@ -137,7 +137,11 @@ Push notifications son clave para alertas de caducidad.
 - [x] Dashboard con alertas de caducidad
 - [x] Gamificación (FreskoPoints + rachas + badges)
 - [x] Generador de recetas con caché SHA-256
-- [x] OCR de tickets
+- [x] OCR de tickets (vision + JSON repair + compresión cliente)
+- [x] OCR UX: no-alimentos en DB, X por producto, aclaración nombres truncados/ambiguos
+- [x] Onboarding modal: T&C + provincia (primer login)
+- [x] consumption_events: registro completo de consumo (base monetización datos)
+- [x] Estadísticas con badges dinámicos y progreso gamificación
 - [ ] Stripe (checkout + webhooks + guards premium)
 - [ ] Deploy Vercel
 
@@ -169,6 +173,14 @@ El proyecto vive en **`D:\GetFresko`**. Existe una carpeta vacía en `C:\Users\u
 ---
 
 ## Contexto de sesiones anteriores
+
+### Sesión 5 — 2026-04-16
+- OCR: no-alimentos se guardan en `consumption_events` con `action: 'ticket_non_food'` (antes se descartaban)
+- OCR: botón X (top-right) por cada producto para eliminarlo antes de añadir a despensa
+- OCR: `removedIndices` Set — productos eliminados no bloquean el botón de añadir aunque necesitaran aclaración
+- OCR: contadores de header y botón usan `activeFood` (sin eliminados)
+- Bug fix: `needsClarification` excluye índices en `removedIndices`
+- **Próxima sesión:** Stripe (checkout + webhooks), deploy Vercel
 
 ### Sesión 4 — 2026-04-16
 - Onboarding modal al primer login: T&C completo con cláusula de cesión de datos anonimizados (§7.3) enterrada en lenguaje legal + selector de 52 provincias españolas

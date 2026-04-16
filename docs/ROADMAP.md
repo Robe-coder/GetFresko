@@ -17,6 +17,12 @@
 - [x] Generador de recetas con claude-sonnet-4-6 vía OpenRouter
 - [x] Caché de recetas (recipes_cache + hash SHA-256)
 - [x] OCR de tickets con claude-haiku-4-5 vision
+- [x] OCR: no-alimentos guardados en consumption_events (ticket_non_food)
+- [x] OCR: botón X por producto para eliminar antes de añadir a despensa
+- [x] OCR: aclaración de nombres truncados/ambiguos (sugerencias + input libre)
+- [x] OCR: auto-detección de básicos desde ticket
+- [x] Onboarding: T&C + selector de provincia en primer login
+- [x] consumption_events: registro de todos los consumos (base datos monetización)
 - [ ] Límites del plan gratuito (middleware de cuotas) — siguiente
 
 ## Monetización y Deploy
