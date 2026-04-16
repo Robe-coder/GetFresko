@@ -22,6 +22,7 @@ export async function generateRecipe(
 
   const dietType = (formData.get('diet_type') as string) || 'omnivore'
   const selectedIds = formData.getAll('product_ids') as string[]
+  const basicNames = formData.getAll('basic_names') as string[]
 
   if (selectedIds.length === 0) {
     return { recipe: null, error: 'Selecciona al menos un ingrediente', cached: false }
@@ -39,10 +40,10 @@ export async function generateRecipe(
     return { recipe: null, error: 'No se encontraron los productos seleccionados', cached: false }
   }
 
-  // Build sorted list for deterministic hash
-  const sortedNames = products
-    .map(p => p.custom_name.toLowerCase().trim())
-    .sort()
+  // Build sorted list for deterministic hash (pantry + basics)
+  const pantryNames = products.map(p => p.custom_name.toLowerCase().trim()).sort()
+  const sortedBasics = [...basicNames].map(b => b.toLowerCase().trim()).sort()
+  const sortedNames = [...pantryNames, ...sortedBasics]
 
   const ingredientsHash = createHash('sha256')
     .update(sortedNames.join(',') + ':' + dietType)
@@ -64,12 +65,15 @@ export async function generateRecipe(
   }
 
   // 2. Generate with AI
-  const ingredientsText = products
+  const pantryText = products
     .map(p => {
       const expiry = p.expiry_date ? ` (caduca: ${p.expiry_date})` : ''
       return p.custom_name + expiry
     })
     .join(', ')
+
+  const basicsText = basicNames.length > 0 ? basicNames.join(', ') : 'ninguno'
+  const ingredientsText = `DESPENSA: ${pantryText}\nBÁSICOS DISPONIBLES: ${basicsText}`
 
   let recipe: RecipeJson
   try {
@@ -87,10 +91,19 @@ export async function generateRecipe(
     const text =
       message.content[0].type === 'text' ? message.content[0].text : ''
 
-    // Strip possible markdown code fences
-    const json = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-    recipe = JSON.parse(json)
-  } catch {
+    // Strip possible markdown code fences and extract JSON
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    const json = jsonMatch ? jsonMatch[0] : text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+    const parsed = JSON.parse(json)
+
+    // IA indica que no hay suficientes ingredientes
+    if (parsed.insufficient) {
+      return { recipe: null, error: parsed.message ?? 'Con estos ingredientes no es posible hacer una receta. Añade más productos a tu despensa.', cached: false }
+    }
+
+    recipe = parsed
+  } catch (err) {
+    console.error('[generateRecipe] AI error:', err)
     return { recipe: null, error: 'Error al generar la receta. Inténtalo de nuevo.', cached: false }
   }
 
@@ -102,8 +115,8 @@ export async function generateRecipe(
     recipe_json: recipe,
   })
 
-  // 4. Award points + update streak
-  await Promise.all([
+  // 4. Award points + update streak (best-effort, no lanzar si la función no existe)
+  await Promise.allSettled([
     supabase.rpc('add_freskopoints', {
       p_user_id: user.id,
       p_points: GAMIFICATION_POINTS.recipe_used,

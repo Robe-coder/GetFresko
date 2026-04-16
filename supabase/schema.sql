@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT,
   display_name TEXT,
+  province TEXT,
+  onboarding_completed BOOLEAN DEFAULT FALSE,
+  terms_accepted_at TIMESTAMPTZ,
   freskopoints INTEGER DEFAULT 0,
   current_streak INTEGER DEFAULT 0,
   longest_streak INTEGER DEFAULT 0,
@@ -130,6 +133,30 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- ============================================================
+-- CONSUMPTION_EVENTS — Registro anonimizable de consumo por usuario
+-- ============================================================
+CREATE TABLE IF NOT EXISTS consumption_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  product_name TEXT NOT NULL,
+  category TEXT,
+  location TEXT,
+  action TEXT NOT NULL, -- 'added' | 'eaten' | 'wasted' | 'recipe_used' | 'ticket_scanned'
+  province TEXT,
+  quantity NUMERIC,
+  unit TEXT,
+  purchase_date DATE,
+  expiry_date DATE,
+  days_before_expiry INTEGER, -- positivo=consumido antes, negativo=caducado
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE consumption_events ENABLE ROW LEVEL SECURITY;
+-- Solo el propio usuario puede ver sus eventos (los análisis se harán vía service_role)
+CREATE POLICY "consumption_events: own rows"
+  ON consumption_events FOR ALL USING (auth.uid() = user_id);
 
 -- ============================================================
 -- FUNCIÓN: add_freskopoints — sumar/restar puntos al perfil

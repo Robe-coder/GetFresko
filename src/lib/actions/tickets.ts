@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { aiClient, AI_MODELS, AI_PROMPTS } from '@/lib/ai'
+import { AI_MODELS, AI_PROMPTS } from '@/lib/ai'
 import { GAMIFICATION_POINTS } from '@/types/index'
 
 export type ScannedProduct = {
@@ -29,54 +29,93 @@ export async function scanTicket(
     return { products: null, error: 'Selecciona una imagen del ticket' }
   }
 
-  // Validate type
+  // Aceptar también image/jpg por si el DataTransfer lo pone así
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-  if (!allowedTypes.includes(file.type)) {
-    return { products: null, error: 'Formato no soportado. Usa JPG, PNG o WebP.' }
+  const mimeType = file.type || 'image/jpeg'
+  if (!allowedTypes.includes(mimeType)) {
+    return { products: null, error: `Formato no soportado (${mimeType}). Usa JPG, PNG o WebP.` }
   }
 
-  // Max 4MB
-  if (file.size > 4 * 1024 * 1024) {
-    return { products: null, error: 'La imagen es demasiado grande (máx. 4MB)' }
+  // 6MB limit (matches next.config.ts bodySizeLimit)
+  if (file.size > 6 * 1024 * 1024) {
+    return { products: null, error: 'La imagen es demasiado grande (máx. 6MB)' }
   }
 
   // Convert to base64
   const bytes = await file.arrayBuffer()
   const base64 = Buffer.from(bytes).toString('base64')
-  const mediaType = file.type as 'image/jpeg' | 'image/png' | 'image/webp'
 
+  // Usar fetch directo a OpenRouter (formato OpenAI-compatible con image_url)
+  // El SDK de Anthropic tiene problemas con visión en modo proxy
   let products: ScannedProduct[]
   try {
-    const message = await aiClient.messages.create({
-      model: AI_MODELS.ocr,
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: base64,
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://getfresko.app',
+        'X-Title': 'GetFresko',
+      },
+      body: JSON.stringify({
+        model: AI_MODELS.ocr,
+        max_tokens: 3000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${base64}`,
+                },
               },
-            },
-            {
-              type: 'text',
-              text: AI_PROMPTS.ocr(),
-            },
-          ],
-        },
-      ],
+              {
+                type: 'text',
+                text: AI_PROMPTS.ocr(),
+              },
+            ],
+          },
+        ],
+      }),
     })
 
-    const text =
-      message.content[0].type === 'text' ? message.content[0].text : ''
-    const json = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-    const result = JSON.parse(json)
+    if (!res.ok) {
+      const errBody = await res.text()
+      console.error('[scanTicket] OpenRouter error:', res.status, errBody)
+      return { products: null, error: `Error del servidor de IA (${res.status}). Inténtalo de nuevo.` }
+    }
+
+    const data = await res.json()
+    const text = data.choices?.[0]?.message?.content ?? ''
+
+    // Extraer JSON — varios intentos de limpieza
+    let result: { productos?: ScannedProduct[] } | null = null
+    const attempts = [
+      // 1. Extraer primer objeto JSON completo
+      () => { const m = text.match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : null },
+      // 2. Sin code fences
+      () => JSON.parse(text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()),
+      // 3. Reparar JSON truncado: cerrar arrays/objetos abiertos
+      () => {
+        let s = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+        // Contar llaves/corchetes y cerrar los que faltan
+        let braces = 0, brackets = 0
+        for (const c of s) { if (c==='{') braces++; else if (c==='}') braces--; else if (c==='[') brackets++; else if (c===']') brackets-- }
+        // Quitar coma trailing antes de cerrar
+        s = s.replace(/,\s*([}\]])/g, '$1')
+        if (brackets > 0) s += ']'.repeat(brackets)
+        if (braces > 0) s += '}'.repeat(braces)
+        return JSON.parse(s)
+      },
+    ]
+    for (const attempt of attempts) {
+      try { result = attempt(); if (result) break } catch { /* siguiente intento */ }
+    }
+    if (!result) throw new Error(`JSON inválido: ${text.slice(0, 200)}`)
     products = result.productos ?? []
-  } catch {
+  } catch (err) {
+    console.error('[scanTicket] error:', err)
     return { products: null, error: 'No se pudo analizar el ticket. Inténtalo con una foto más clara.' }
   }
 
@@ -84,8 +123,7 @@ export async function scanTicket(
     return { products: null, error: 'No se encontraron productos en el ticket.' }
   }
 
-  // Award points + update streak
-  await Promise.all([
+  await Promise.allSettled([
     supabase.rpc('add_freskopoints', {
       p_user_id: user.id,
       p_points: GAMIFICATION_POINTS.ticket_scanned,
@@ -121,7 +159,6 @@ export async function addScannedProducts(products: ScannedProduct[]) {
   const { error } = await supabase.from('user_products').insert(rows)
   if (error) return { error: error.message }
 
-  // Points per product added
   await supabase.rpc('add_freskopoints', {
     p_user_id: user.id,
     p_points: GAMIFICATION_POINTS.product_added * rows.length,

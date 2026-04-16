@@ -17,18 +17,60 @@ const DIET_OPTIONS = [
   { value: 'glutenfree', label: 'Sin gluten', emoji: '🌾' },
 ]
 
+const BASICS_LIST = [
+  { key: 'sal',           label: 'Sal',             emoji: '🧂' },
+  { key: 'pimienta',      label: 'Pimienta',         emoji: '🌶️' },
+  { key: 'aceite_oliva',  label: 'Aceite de oliva',  emoji: '🫒' },
+  { key: 'aceite_girasol',label: 'Aceite girasol',   emoji: '🌻' },
+  { key: 'mantequilla',   label: 'Mantequilla',      emoji: '🧈' },
+  { key: 'agua',          label: 'Agua',             emoji: '💧' },
+  { key: 'azucar',        label: 'Azúcar',           emoji: '🍯' },
+  { key: 'harina',        label: 'Harina',           emoji: '🌾' },
+  { key: 'vinagre',       label: 'Vinagre',          emoji: '🫙' },
+  { key: 'oregano',       label: 'Orégano',          emoji: '🌿' },
+  { key: 'pimenton',      label: 'Pimentón',         emoji: '🔴' },
+  { key: 'ajo_polvo',     label: 'Ajo en polvo',     emoji: '🧄' },
+  { key: 'caldo',         label: 'Caldo',            emoji: '🍵' },
+  { key: 'laurel',        label: 'Laurel',           emoji: '🍃' },
+]
+
+// Todos los básicos empiezan marcados — el usuario desmarca los que no tiene
+const DEFAULT_BASICS = new Set(BASICS_LIST.map(b => b.key))
+
+function normalize(s: string) {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, '').trim()
+}
+
+function isBasicInPantry(basicLabel: string, products: Product[]): boolean {
+  const norm = normalize(basicLabel)
+  return products.some(p => {
+    const pNorm = normalize(p.custom_name)
+    return norm.split(' ').some(w => w.length > 2 && pNorm.includes(w)) ||
+           pNorm.split(' ').some(w => w.length > 2 && norm.includes(w))
+  })
+}
+
 const initial: RecipeState = { recipe: null, error: null, cached: false }
 
 export function RecipeGenerator({ products }: { products: Product[] }) {
   const [state, action, isPending] = useActionState(generateRecipe, initial)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(products.filter(p => p.expiry_date).slice(0, 6).map(p => p.id))
+    () => new Set(products.slice(0, 8).map(p => p.id))
   )
+  const [selectedBasics, setSelectedBasics] = useState<Set<string>>(DEFAULT_BASICS)
 
-  function toggle(id: string) {
+  function toggleProduct(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleBasic(key: string) {
+    setSelectedBasics(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
       return next
     })
   }
@@ -41,12 +83,15 @@ export function RecipeGenerator({ products }: { products: Product[] }) {
     return Math.ceil((new Date(date).getTime() - today.getTime()) / 86400000)
   }
 
+  // Construir lista de básicos seleccionados para enviar al action
+  const selectedBasicNames = BASICS_LIST
+    .filter(b => selectedBasics.has(b.key))
+    .map(b => b.label)
+
   return (
     <div className="px-4 py-4 space-y-5">
       {/* Recipe result */}
-      {state.recipe && (
-        <RecipeCard recipe={state.recipe} cached={state.cached} />
-      )}
+      {state.recipe && <RecipeCard recipe={state.recipe} cached={state.cached} />}
 
       {state.error && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -55,9 +100,13 @@ export function RecipeGenerator({ products }: { products: Product[] }) {
       )}
 
       <form action={action} className="space-y-5">
-        {/* Hidden selected ids */}
+        {/* Hidden: selected product ids */}
         {Array.from(selectedIds).map(id => (
           <input key={id} type="hidden" name="product_ids" value={id} />
+        ))}
+        {/* Hidden: selected basics */}
+        {selectedBasicNames.map(name => (
+          <input key={name} type="hidden" name="basic_names" value={name} />
         ))}
 
         {/* Diet type */}
@@ -76,30 +125,27 @@ export function RecipeGenerator({ products }: { products: Product[] }) {
           </div>
         </div>
 
-        {/* Ingredient selector */}
+        {/* Pantry ingredients */}
         <div>
           <p className="text-xs font-semibold text-gray-500 mb-2">
-            Ingredientes ({selectedIds.size} seleccionados)
+            Ingredientes de tu despensa ({selectedIds.size} seleccionados)
           </p>
           {products.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
               Tu despensa está vacía. Añade productos primero.
             </div>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
               {products.map(p => {
                 const days = daysLeft(p.expiry_date)
-                const isUrgent = days !== null && days <= 2
                 const isChecked = selectedIds.has(p.id)
                 return (
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => toggle(p.id)}
+                    onClick={() => toggleProduct(p.id)}
                     className={`w-full flex items-center justify-between rounded-xl border-2 px-4 py-2.5 text-left transition ${
-                      isChecked
-                        ? 'border-green-400 bg-green-50'
-                        : 'border-gray-200 bg-white'
+                      isChecked ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -116,7 +162,7 @@ export function RecipeGenerator({ products }: { products: Product[] }) {
                     </div>
                     {days !== null && (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        isUrgent ? 'bg-red-50 text-red-600' :
+                        days <= 2 ? 'bg-red-50 text-red-600' :
                         days <= 5 ? 'bg-orange-50 text-orange-600' :
                         'bg-gray-50 text-gray-400'
                       }`}>
@@ -128,6 +174,56 @@ export function RecipeGenerator({ products }: { products: Product[] }) {
               })}
             </div>
           )}
+        </div>
+
+        {/* Basics */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500">Básicos de cocina</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedBasics(new Set(BASICS_LIST.map(b => b.key)))}
+                className="text-[11px] text-green-600 font-medium hover:underline"
+              >
+                Todos
+              </button>
+              <span className="text-gray-200">|</span>
+              <button
+                type="button"
+                onClick={() => setSelectedBasics(new Set())}
+                className="text-[11px] text-gray-400 font-medium hover:underline"
+              >
+                Ninguno
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {BASICS_LIST.map(b => {
+              const active = selectedBasics.has(b.key)
+              const inPantry = isBasicInPantry(b.label, products)
+              return (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => toggleBasic(b.key)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    active
+                      ? inPantry
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-green-400 bg-green-50 text-green-700'
+                      : 'border-gray-200 bg-white text-gray-400 line-through'
+                  }`}
+                >
+                  <span>{b.emoji}</span>
+                  <span>{b.label}</span>
+                  {inPantry && active && (
+                    <span className="ml-0.5 text-emerald-500">✓</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <button
@@ -144,7 +240,7 @@ export function RecipeGenerator({ products }: { products: Product[] }) {
               Generando receta...
             </>
           ) : (
-            <>👨‍🍳 Generar receta +{5}⭐</>
+            <>👨‍🍳 Generar receta +5⭐</>
           )}
         </button>
       </form>
@@ -152,7 +248,12 @@ export function RecipeGenerator({ products }: { products: Product[] }) {
   )
 }
 
-function RecipeCard({ recipe, cached }: { recipe: NonNullable<RecipeState['recipe']>; cached: boolean }) {
+function RecipeCard({
+  recipe, cached,
+}: {
+  recipe: NonNullable<RecipeState['recipe']>
+  cached: boolean
+}) {
   const difficultyColor = {
     'fácil': 'bg-green-50 text-green-700',
     'media': 'bg-orange-50 text-orange-700',
@@ -161,17 +262,14 @@ function RecipeCard({ recipe, cached }: { recipe: NonNullable<RecipeState['recip
 
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-4 text-white">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-base font-bold leading-tight">{recipe.title}</h2>
           {cached && (
-            <span className="shrink-0 text-[10px] bg-white/20 rounded-full px-2 py-0.5">
-              de caché
-            </span>
+            <span className="shrink-0 text-[10px] bg-white/20 rounded-full px-2 py-0.5">de caché</span>
           )}
         </div>
-        <div className="flex gap-3 mt-2 text-xs text-green-100">
+        <div className="flex flex-wrap gap-3 mt-2 text-xs text-green-100">
           <span>🍽️ {recipe.servings} personas</span>
           <span>⏱️ {recipe.prepTime} min</span>
           <span className={`rounded-full px-2 py-0.5 ${difficultyColor} text-xs font-medium`}>
@@ -181,7 +279,6 @@ function RecipeCard({ recipe, cached }: { recipe: NonNullable<RecipeState['recip
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        {/* Ingredients */}
         <div>
           <p className="text-xs font-semibold text-gray-500 mb-2">Ingredientes</p>
           <ul className="space-y-1">
@@ -194,7 +291,6 @@ function RecipeCard({ recipe, cached }: { recipe: NonNullable<RecipeState['recip
           </ul>
         </div>
 
-        {/* Steps */}
         <div>
           <p className="text-xs font-semibold text-gray-500 mb-2">Pasos</p>
           <ol className="space-y-2">
@@ -209,7 +305,6 @@ function RecipeCard({ recipe, cached }: { recipe: NonNullable<RecipeState['recip
           </ol>
         </div>
 
-        {/* Tips */}
         {recipe.tips && (
           <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-3 text-xs text-amber-800">
             <span className="font-semibold">Tip: </span>{recipe.tips}

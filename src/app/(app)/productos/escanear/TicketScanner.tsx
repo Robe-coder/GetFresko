@@ -1,9 +1,40 @@
 'use client'
 
 import { useActionState, useRef, useState, useTransition } from 'react'
-import Image from 'next/image'
 import { scanTicket, addScannedProducts, type TicketState, type ScannedProduct } from '@/lib/actions/tickets'
 import { useRouter } from 'next/navigation'
+
+const BASICS_LIST = [
+  { key: 'sal',            label: 'Sal',             emoji: '🧂' },
+  { key: 'pimienta',       label: 'Pimienta',         emoji: '🌶️' },
+  { key: 'aceite_oliva',   label: 'Aceite de oliva',  emoji: '🫒' },
+  { key: 'aceite_girasol', label: 'Aceite girasol',   emoji: '🌻' },
+  { key: 'mantequilla',    label: 'Mantequilla',       emoji: '🧈' },
+  { key: 'agua',           label: 'Agua',              emoji: '💧' },
+  { key: 'azucar',         label: 'Azúcar',            emoji: '🍯' },
+  { key: 'harina',         label: 'Harina',            emoji: '🌾' },
+  { key: 'vinagre',        label: 'Vinagre',           emoji: '🫙' },
+  { key: 'oregano',        label: 'Orégano',           emoji: '🌿' },
+  { key: 'pimenton',       label: 'Pimentón',          emoji: '🔴' },
+  { key: 'ajo_polvo',      label: 'Ajo en polvo',      emoji: '🧄' },
+  { key: 'caldo',          label: 'Caldo',             emoji: '🍵' },
+  { key: 'laurel',         label: 'Laurel',            emoji: '🍃' },
+]
+
+function normalize(s: string) {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, '').trim()
+}
+
+function detectBasicsInProducts(scanned: ScannedProduct[]) {
+  return BASICS_LIST.filter(b => {
+    const bNorm = normalize(b.label)
+    return scanned.some(p => {
+      const pNorm = normalize(p.nombre ?? '')
+      return bNorm.split(' ').some(w => w.length > 2 && pNorm.includes(w)) ||
+             pNorm.split(' ').some(w => w.length > 2 && bNorm.includes(w))
+    })
+  })
+}
 
 const initial: TicketState = { products: null, error: null }
 
@@ -22,8 +53,33 @@ export function TicketScanner() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const url = URL.createObjectURL(file)
-    setPreview(url)
+
+    // Comprimir antes de previsualizar y enviar
+    const img = new window.Image()
+    const objectUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      const MAX = 1400 // px max dimension
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX }
+        else { width = Math.round((width * MAX) / height); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(blob => {
+        if (!blob) return
+        const compressed = new File([blob], file.name, { type: 'image/jpeg' })
+        // Reemplazar el input con el archivo comprimido
+        const dt = new DataTransfer()
+        dt.items.add(compressed)
+        if (fileRef.current) fileRef.current.files = dt.files
+        setPreview(URL.createObjectURL(compressed))
+      }, 'image/jpeg', 0.82)
+      URL.revokeObjectURL(objectUrl)
+    }
+    img.src = objectUrl
     setAdded(false)
     setConfirmed([])
   }
@@ -134,6 +190,26 @@ export function TicketScanner() {
               </div>
             ))}
           </div>
+
+          {/* Básicos detectados */}
+          {(() => {
+            const detected = detectBasicsInProducts(state.products!)
+            if (!detected.length) return null
+            return (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-3">
+                <p className="text-xs font-semibold text-emerald-700 mb-2">
+                  🧂 Básicos detectados — se marcarán como disponibles
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {detected.map(b => (
+                    <span key={b.key} className="flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-300 px-2 py-1 text-xs text-emerald-800 font-medium">
+                      {b.emoji} {b.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           <button
             onClick={handleAdd}

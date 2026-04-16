@@ -53,7 +53,7 @@ export async function updateProductStatus(
 
   const { data: product } = await supabase
     .from('user_products')
-    .select('expiry_date')
+    .select('expiry_date, custom_name, location, quantity, unit, purchase_date')
     .eq('id', productId)
     .eq('user_id', user.id)
     .single()
@@ -77,12 +77,33 @@ export async function updateProductStatus(
     points = GAMIFICATION_POINTS.product_wasted // negativo
   }
 
-  await Promise.all([
-    supabase.rpc('add_freskopoints', {
-      p_user_id: user.id,
-      p_points: points,
-    }),
+  // Obtener provincia del perfil para el evento de consumo
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('province')
+    .eq('id', user.id)
+    .single()
+
+  const today = new Date().toISOString().split('T')[0]
+  const daysBeforeExpiry = product?.expiry_date
+    ? Math.ceil((new Date(product.expiry_date).getTime() - new Date(today).getTime()) / 86400000)
+    : null
+
+  await Promise.allSettled([
+    supabase.rpc('add_freskopoints', { p_user_id: user.id, p_points: points }),
     supabase.rpc('update_streak', { p_user_id: user.id }),
+    supabase.from('consumption_events').insert({
+      user_id: user.id,
+      product_name: product?.custom_name ?? 'desconocido',
+      location: product?.location ?? null,
+      action: status,
+      province: profile?.province ?? null,
+      quantity: product?.quantity ?? null,
+      unit: product?.unit ?? null,
+      purchase_date: product?.purchase_date ?? null,
+      expiry_date: product?.expiry_date ?? null,
+      days_before_expiry: daysBeforeExpiry,
+    }),
   ])
 
   revalidatePath('/productos')
