@@ -78,24 +78,44 @@ export function TicketScanner() {
     img.src = objectUrl
     setAdded(false)
     setResolved({})
+    setDismissed(false)
   }
 
-  const allProducts = state.products ?? []
+  const [dismissed, setDismissed] = useState(false)
+  const [removedIndices, setRemovedIndices] = useState<Set<number>>(new Set())
+
+  function handleClear() {
+    setDismissed(true)
+    setPreview(null)
+    setResolved({})
+    setAdded(false)
+    setShowNonFood(false)
+    setRemovedIndices(new Set())
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  function removeProduct(idx: number) {
+    setRemovedIndices(prev => new Set([...prev, idx]))
+    // Limpiar resolved si existía
+    setResolved(r => { const n = {...r}; delete n[idx]; return n })
+  }
+
+  const allProducts = (!dismissed && state.products) ? state.products : []
   const foodProducts = allProducts.filter(p => p.es_comida !== false)
   const nonFoodProducts = allProducts.filter(p => p.es_comida === false)
-  const needsClarification = foodProducts.filter(p => p.truncado || p.ambiguo)
-  const allResolved = needsClarification.every((_, i) => {
-    const idx = foodProducts.indexOf(_)
+  const activeFood = foodProducts.filter((_, i) => !removedIndices.has(i))
+  const needsClarification = foodProducts.filter((p, i) => !removedIndices.has(i) && (p.truncado || p.ambiguo))
+  const allResolved = needsClarification.every(p => {
+    const idx = foodProducts.indexOf(p)
     return !!resolved[idx]
   })
 
   function handleAdd() {
     startAdding(async () => {
-      const toAdd = foodProducts.map((p, i) => ({
-        ...p,
-        nombre: resolved[i] ?? p.nombre,
-      }))
-      const { error } = await addScannedProducts(toAdd)
+      const toAdd = foodProducts
+        .map((p, i) => ({ ...p, nombre: resolved[i] ?? p.nombre }))
+        .filter((_, i) => !removedIndices.has(i))
+      const { error } = await addScannedProducts(toAdd, nonFoodProducts)
       if (!error) {
         setAdded(true)
         setTimeout(() => router.push('/productos'), 1200)
@@ -168,31 +188,56 @@ export function TicketScanner() {
       )}
 
       {/* Results */}
-      {foodProducts.length > 0 && !added && (
+      {activeFood.length > 0 && !added && (
         <div className="space-y-4">
 
           {/* Header */}
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">
-              {foodProducts.length} alimentos encontrados
+              {activeFood.length} alimentos encontrados
             </p>
-            <span className="text-xs text-green-600 font-medium">+8⭐ ganados</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-green-600 font-medium">+8⭐ ganados</span>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="text-xs text-gray-400 hover:text-red-500 transition flex items-center gap-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                Descartar
+              </button>
+            </div>
           </div>
 
           {/* Food products list */}
           <div className="space-y-2">
             {foodProducts.map((p, i) => {
+              if (removedIndices.has(i)) return null
               const needsClarity = p.truncado || p.ambiguo
               const isResolved = !!resolved[i]
 
               return (
-                <div key={i} className={`rounded-xl border shadow-sm overflow-hidden ${
+                <div key={i} className={`rounded-xl border shadow-sm overflow-hidden relative ${
                   needsClarity && !isResolved
                     ? 'border-amber-200 bg-amber-50'
                     : 'border-gray-100 bg-white'
                 }`}>
+                  {/* X button */}
+                  <button
+                    type="button"
+                    onClick={() => removeProduct(i)}
+                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gray-100 hover:bg-red-100 hover:text-red-500 flex items-center justify-center text-gray-400 transition z-10"
+                    title="Eliminar"
+                  >
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/>
+                    </svg>
+                  </button>
+
                   {/* Product row */}
-                  <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex items-center gap-3 px-4 py-3 pr-8">
                     <span className="text-lg">
                       {needsClarity && !isResolved ? '❓' : '🛒'}
                     </span>
@@ -219,9 +264,9 @@ export function TicketScanner() {
                       <button
                         type="button"
                         onClick={() => setResolved(r => { const n = {...r}; delete n[i]; return n })}
-                        className="text-xs text-gray-400 hover:text-gray-600"
+                        className="text-xs text-gray-400 hover:text-gray-600 mr-4"
                       >
-                        ✕
+                        editar
                       </button>
                     )}
                   </div>
@@ -306,7 +351,7 @@ export function TicketScanner() {
                 </svg>
                 Añadiendo...
               </>
-            ) : `➕ Añadir ${foodProducts.length} alimentos a la despensa`}
+            ) : `➕ Añadir ${activeFood.length} alimentos a la despensa`}
           </button>
         </div>
       )}

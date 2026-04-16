@@ -139,14 +139,24 @@ export async function scanTicket(
   return { products, error: null }
 }
 
-export async function addScannedProducts(products: ScannedProduct[]) {
+export async function addScannedProducts(
+  foodProducts: ScannedProduct[],
+  nonFoodProducts: ScannedProduct[]
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('province')
+    .eq('id', user.id)
+    .single()
+
   const today = new Date().toISOString().split('T')[0]
 
-  const rows = products
+  // 1. Añadir alimentos a la despensa
+  const foodRows = foodProducts
     .filter(p => p.nombre?.trim())
     .map(p => ({
       user_id: user.id,
@@ -158,15 +168,34 @@ export async function addScannedProducts(products: ScannedProduct[]) {
       status: 'active',
     }))
 
-  if (!rows.length) return { error: 'No hay productos para añadir' }
+  if (foodRows.length) {
+    const { error } = await supabase.from('user_products').insert(foodRows)
+    if (error) return { error: error.message }
+  }
 
-  const { error } = await supabase.from('user_products').insert(rows)
-  if (error) return { error: error.message }
+  // 2. Guardar TODOS los productos (food + non-food) en consumption_events
+  const allProducts = [...foodProducts, ...nonFoodProducts]
+  const eventRows = allProducts
+    .filter(p => p.nombre?.trim())
+    .map(p => ({
+      user_id: user.id,
+      product_name: p.nombre.trim(),
+      action: p.es_comida !== false ? 'ticket_scanned' : 'ticket_non_food',
+      province: profile?.province ?? null,
+      quantity: p.cantidad ?? null,
+    }))
 
-  await supabase.rpc('add_freskopoints', {
-    p_user_id: user.id,
-    p_points: GAMIFICATION_POINTS.product_added * rows.length,
-  })
+  if (eventRows.length) {
+    await supabase.from('consumption_events').insert(eventRows)
+  }
+
+  // 3. Puntos por producto añadido
+  if (foodRows.length) {
+    await supabase.rpc('add_freskopoints', {
+      p_user_id: user.id,
+      p_points: GAMIFICATION_POINTS.product_added * foodRows.length,
+    })
+  }
 
   revalidatePath('/productos')
   revalidatePath('/dashboard')
