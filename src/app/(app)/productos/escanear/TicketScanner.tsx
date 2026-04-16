@@ -41,37 +41,33 @@ const initial: TicketState = { products: null, error: null }
 export function TicketScanner() {
   const [state, action, isPending] = useActionState(scanTicket, initial)
   const [preview, setPreview] = useState<string | null>(null)
-  const [confirmed, setConfirmed] = useState<ScannedProduct[]>([])
   const [adding, startAdding] = useTransition()
   const [added, setAdded] = useState(false)
+  // Map productIndex → resolved name (for truncated/ambiguous)
+  const [resolved, setResolved] = useState<Record<number, string>>({})
+  const [showNonFood, setShowNonFood] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
-
-  // When products arrive, init confirmation list
-  const products = state.products ?? confirmed
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Comprimir antes de previsualizar y enviar
     const img = new window.Image()
     const objectUrl = URL.createObjectURL(file)
     img.onload = () => {
-      const MAX = 1400 // px max dimension
+      const MAX = 1400
       let { width, height } = img
       if (width > MAX || height > MAX) {
         if (width > height) { height = Math.round((height * MAX) / width); width = MAX }
         else { width = Math.round((width * MAX) / height); height = MAX }
       }
       const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
+      canvas.width = width; canvas.height = height
       canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
       canvas.toBlob(blob => {
         if (!blob) return
         const compressed = new File([blob], file.name, { type: 'image/jpeg' })
-        // Reemplazar el input con el archivo comprimido
         const dt = new DataTransfer()
         dt.items.add(compressed)
         if (fileRef.current) fileRef.current.files = dt.files
@@ -81,12 +77,24 @@ export function TicketScanner() {
     }
     img.src = objectUrl
     setAdded(false)
-    setConfirmed([])
+    setResolved({})
   }
+
+  const allProducts = state.products ?? []
+  const foodProducts = allProducts.filter(p => p.es_comida !== false)
+  const nonFoodProducts = allProducts.filter(p => p.es_comida === false)
+  const needsClarification = foodProducts.filter(p => p.truncado || p.ambiguo)
+  const allResolved = needsClarification.every((_, i) => {
+    const idx = foodProducts.indexOf(_)
+    return !!resolved[idx]
+  })
 
   function handleAdd() {
     startAdding(async () => {
-      const toAdd = state.products ?? []
+      const toAdd = foodProducts.map((p, i) => ({
+        ...p,
+        nombre: resolved[i] ?? p.nombre,
+      }))
       const { error } = await addScannedProducts(toAdd)
       if (!error) {
         setAdded(true)
@@ -99,7 +107,7 @@ export function TicketScanner() {
     <div className="px-4 py-4 space-y-4">
       {/* Intro */}
       <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-800">
-        Fotografía el ticket del supermercado y la IA extraerá los productos automáticamente.
+        Fotografía el ticket y la IA extraerá solo los alimentos automáticamente.
         <span className="font-semibold"> +8⭐ por escaneo</span>
       </div>
 
@@ -110,13 +118,8 @@ export function TicketScanner() {
           onClick={() => fileRef.current?.click()}
         >
           {preview ? (
-            <div className="relative w-full" style={{ minHeight: 200 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={preview}
-                alt="Vista previa del ticket"
-                className="w-full max-h-72 object-contain"
-              />
+            <div className="relative w-full">
+              <img src={preview} alt="Vista previa" className="w-full max-h-72 object-contain" />
               <div className="absolute bottom-2 right-2 bg-white/90 rounded-lg px-2 py-1 text-xs text-gray-600 shadow">
                 Toca para cambiar
               </div>
@@ -125,7 +128,7 @@ export function TicketScanner() {
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <span className="text-5xl mb-3">📷</span>
               <p className="text-sm font-medium text-gray-600">Toca para añadir foto</p>
-              <p className="text-xs mt-1">JPG, PNG o WebP · Máx. 4MB</p>
+              <p className="text-xs mt-1">JPG, PNG o WebP · Máx. 6MB</p>
             </div>
           )}
         </div>
@@ -153,9 +156,7 @@ export function TicketScanner() {
               </svg>
               Analizando ticket...
             </>
-          ) : (
-            <>🔍 Analizar ticket</>
-          )}
+          ) : <>🔍 Analizar ticket</>}
         </button>
       </form>
 
@@ -166,34 +167,80 @@ export function TicketScanner() {
         </div>
       )}
 
-      {/* Extracted products */}
-      {state.products && state.products.length > 0 && !added && (
-        <div className="space-y-3">
+      {/* Results */}
+      {foodProducts.length > 0 && !added && (
+        <div className="space-y-4">
+
+          {/* Header */}
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">
-              {state.products.length} productos encontrados
+              {foodProducts.length} alimentos encontrados
             </p>
             <span className="text-xs text-green-600 font-medium">+8⭐ ganados</span>
           </div>
 
+          {/* Food products list */}
           <div className="space-y-2">
-            {state.products.map((p, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl bg-white border border-gray-100 shadow-sm px-4 py-3">
-                <span className="text-lg">🛒</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{p.nombre}</p>
-                  <p className="text-xs text-gray-400">
-                    {p.cantidad !== null ? `x${p.cantidad}` : ''}
-                    {p.precio !== null ? ` · ${p.precio?.toFixed(2)}€` : ''}
-                  </p>
+            {foodProducts.map((p, i) => {
+              const needsClarity = p.truncado || p.ambiguo
+              const isResolved = !!resolved[i]
+
+              return (
+                <div key={i} className={`rounded-xl border shadow-sm overflow-hidden ${
+                  needsClarity && !isResolved
+                    ? 'border-amber-200 bg-amber-50'
+                    : 'border-gray-100 bg-white'
+                }`}>
+                  {/* Product row */}
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <span className="text-lg">
+                      {needsClarity && !isResolved ? '❓' : '🛒'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${
+                        needsClarity && !isResolved ? 'text-amber-800' : 'text-gray-900'
+                      }`}>
+                        {isResolved ? resolved[i] : p.nombre}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {p.cantidad !== null ? `x${p.cantidad}` : ''}
+                        {p.precio !== null ? ` · ${p.precio.toFixed(2)}€` : ''}
+                        {needsClarity && !isResolved && (
+                          <span className="text-amber-600 font-medium ml-1">
+                            {p.truncado ? '· nombre incompleto' : '· necesita aclaración'}
+                          </span>
+                        )}
+                        {isResolved && (
+                          <span className="text-green-600 font-medium ml-1">· aclarado ✓</span>
+                        )}
+                      </p>
+                    </div>
+                    {isResolved && (
+                      <button
+                        type="button"
+                        onClick={() => setResolved(r => { const n = {...r}; delete n[i]; return n })}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Clarification panel */}
+                  {needsClarity && !isResolved && (
+                    <ClarificationPanel
+                      product={p}
+                      onSelect={name => setResolved(r => ({ ...r, [i]: name }))}
+                    />
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
-          {/* Básicos detectados */}
+          {/* Basics detected */}
           {(() => {
-            const detected = detectBasicsInProducts(state.products!)
+            const detected = detectBasicsInProducts(foodProducts)
             if (!detected.length) return null
             return (
               <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-3">
@@ -211,9 +258,44 @@ export function TicketScanner() {
             )
           })()}
 
+          {/* Non-food section */}
+          {nonFoodProducts.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowNonFood(v => !v)}
+                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showNonFood ? 'rotate-90' : ''}`}>
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+                {nonFoodProducts.length} no alimentarios eliminados
+              </button>
+              {showNonFood && (
+                <div className="mt-2 space-y-1">
+                  {nonFoodProducts.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 text-xs text-gray-400">
+                      <span>🚫</span>
+                      <span className="line-through">{p.nombre}</span>
+                      {p.precio !== null && <span>{p.precio.toFixed(2)}€</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Pending clarifications warning */}
+          {needsClarification.length > 0 && !allResolved && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+              Aclara los productos marcados con ❓ antes de añadir
+            </div>
+          )}
+
+          {/* Add button */}
           <button
             onClick={handleAdd}
-            disabled={adding}
+            disabled={adding || !allResolved && needsClarification.length > 0}
             className="w-full rounded-xl bg-green-600 px-4 py-3.5 text-sm font-semibold text-white shadow transition hover:bg-green-700 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {adding ? (
@@ -224,9 +306,7 @@ export function TicketScanner() {
                 </svg>
                 Añadiendo...
               </>
-            ) : (
-              `➕ Añadir todos a la despensa`
-            )}
+            ) : `➕ Añadir ${foodProducts.length} alimentos a la despensa`}
           </button>
         </div>
       )}
@@ -237,6 +317,60 @@ export function TicketScanner() {
           ✅ Productos añadidos correctamente
         </div>
       )}
+    </div>
+  )
+}
+
+function ClarificationPanel({
+  product,
+  onSelect,
+}: {
+  product: ScannedProduct
+  onSelect: (name: string) => void
+}) {
+  const [custom, setCustom] = useState('')
+
+  return (
+    <div className="border-t border-amber-200 px-4 py-3 bg-white space-y-2">
+      <p className="text-xs text-amber-700 font-medium">
+        {product.truncado ? '¿Cuál es el nombre completo?' : '¿Qué producto es exactamente?'}
+      </p>
+
+      {/* Suggestions */}
+      {product.sugerencias?.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {product.sugerencias.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onSelect(s)}
+              className="rounded-full border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Custom input */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={custom}
+          onChange={e => setCustom(e.target.value)}
+          placeholder="Escribe el nombre..."
+          className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+          onKeyDown={e => { if (e.key === 'Enter' && custom.trim()) onSelect(custom.trim()) }}
+        />
+        <button
+          type="button"
+          disabled={!custom.trim()}
+          onClick={() => custom.trim() && onSelect(custom.trim())}
+          className="rounded-xl bg-green-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 hover:bg-green-700 transition"
+        >
+          OK
+        </button>
+      </div>
     </div>
   )
 }

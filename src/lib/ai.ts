@@ -32,8 +32,15 @@ REGLAS ESTRICTAS:
 `.trim(),
 
   ocr: () => `
-Analiza este ticket de supermercado y extrae los productos comprados.
-Responde SOLO con JSON minificado (sin espacios extra): {"productos":[{"nombre":"string","cantidad":number,"precio":number}]}
-Reglas: nombres cortos (máx 4 palabras), cantidad y precio numéricos o null, excluye subtotales/impuestos/descuentos.
+Analiza este ticket de supermercado. Para cada línea de producto responde con JSON minificado:
+{"productos":[{"nombre":"string","cantidad":number|null,"precio":number|null,"es_comida":bool,"truncado":bool,"ambiguo":bool,"sugerencias":["string"]}]}
+
+Reglas:
+- nombre: máx 4 palabras, tal como aparece en el ticket
+- es_comida: true solo si es alimento o bebida consumible. false para limpieza, higiene, hogar, etc.
+- truncado: true si el nombre parece cortado o abreviado (ej: "LACT S/L", "PCH POLL")
+- ambiguo: true si el nombre no identifica claramente el producto (ej: "sin lactosa", "eco", "light")
+- sugerencias: si truncado o ambiguo, incluye 1-2 nombres completos probables. Si no, array vacío []
+- Excluye subtotales, impuestos, descuentos, tarjetas de fidelización
 `.trim(),
 } as const

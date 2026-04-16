@@ -9,6 +9,10 @@ export type ScannedProduct = {
   nombre: string
   cantidad: number | null
   precio: number | null
+  es_comida: boolean
+  truncado: boolean
+  ambiguo: boolean
+  sugerencias: string[]
 }
 
 export type TicketState = {
