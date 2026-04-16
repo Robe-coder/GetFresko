@@ -170,6 +170,16 @@ El proyecto vive en **`D:\GetFresko`**. Existe una carpeta vacía en `C:\Users\u
 
 ## Contexto de sesiones anteriores
 
+### Sesión 4 — 2026-04-16
+- Onboarding modal al primer login: T&C completo con cláusula de cesión de datos anonimizados (§7.3) enterrada en lenguaje legal + selector de 52 provincias españolas
+- `consumption_events` — tabla que registra cada acción (comido/desperdiciado) con producto, provincia, días hasta caducidad, ubicación
+- `profiles` ampliado con `province`, `onboarding_completed`, `terms_accepted_at`
+- OCR: migrado a fetch directo a OpenRouter (fix SDK visión), max_tokens 3000, parser JSON con 3 niveles de fallback
+- Recetas: básicos todos marcados por defecto, detectados automáticamente desde despensa y tickets escaneados, prompt estricto sin inventar ingredientes
+- `next.config.ts`: bodySizeLimit 6MB, compresión de imagen en cliente
+- Eliminado TanStack DevTools del providers
+- **Próxima sesión:** Stripe (checkout + webhooks), deploy Vercel
+
 ### Sesión 3 — 2026-04-16
 - Generador de recetas IA completo con caché SHA-256 (`src/app/(app)/recetas/` + `src/lib/actions/recipes.ts`)
 - OCR de tickets con visión claude-haiku-4-5 (`src/app/(app)/productos/escanear/` + `src/lib/actions/tickets.ts`)
