@@ -12,7 +12,7 @@ export default async function ProductosPage() {
     .select('*')
     .eq('user_id', user!.id)
     .eq('status', 'active')
-    .order('expiry_date', { ascending: true, nullsFirst: false })
+    .order('custom_name', { ascending: true })
 
   const locations = ['nevera', 'despensa', 'congelador'] as const
   const grouped = locations.map(loc => ({
