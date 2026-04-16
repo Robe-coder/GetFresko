@@ -161,6 +161,10 @@ El proyecto vive en **`D:\GetFresko`**. Existe una carpeta vacía en `C:\Users\u
 - **Convención de commits:** `tipo: descripción corta` (feat, fix, docs, chore, refactor)
 - **Política:** commit + push al final de cada sesión de trabajo
 - **Documentación:** actualizar CLAUDE.md, PROBLEMS.md y ROADMAP.md al final de cada sesión sin que el usuario lo pida
+- **Remote:** configurado como `origin` apuntando a `https://github.com/Robe-coder/GetFresko.git`
+- **GitHub CLI:** instalado en `C:\Program Files\GitHub CLI\gh.exe` (no está en PATH del bash de Claude Code → usar ruta absoluta)
+- **Auth:** `Robe-coder` autenticado vía keyring (token con scopes `repo`, `workflow`, `gist`, `read:org`)
+- **Push:** `git push origin main` funciona directamente desde Claude Code
 
 ---
 

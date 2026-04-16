@@ -71,6 +71,34 @@
 
 ---
 
+## [2026-04-16] gh no está en PATH del bash de Claude Code tras instalar con winget
+
+**Síntoma:** `gh auth status` falla con "command not found" aunque GitHub CLI está instalado.
+
+**Causa:** winget instala `gh` en `C:\Program Files\GitHub CLI\` pero el bash que usa Claude Code no carga el PATH de Windows actualizado. Los comandos `where gh` y `which gh` no lo encuentran.
+
+**Solución:** Usar la ruta absoluta: `"/c/Program Files/GitHub CLI/gh.exe"`. Para `git push` normal no hace falta `gh` — funciona directamente porque el token queda en el keyring de Windows.
+
+**Archivos afectados:** ninguno
+
+**Tags:** #git #github-cli #windows #path
+
+---
+
+## [2026-04-16] Repo GitHub no existía — remote apuntaba al vacío
+
+**Síntoma:** `git push origin main` fallaba con "repository not found". `git remote -v` no mostraba nada (sin remote configurado).
+
+**Causa:** El repo `github.com/Robe-coder/GetFresko` nunca se había creado en GitHub. Solo existía el repo local en `D:\GetFresko`.
+
+**Solución:** Crear el repo con `gh repo create GetFresko --public --source=. --push`. Como el remote `origin` ya había sido añadido y fallado antes, hubo que hacer `git remote remove origin` primero y luego `git remote add origin https://github.com/Robe-coder/GetFresko.git && git push -u origin main`.
+
+**Archivos afectados:** ninguno (configuración de git)
+
+**Tags:** #git #github #setup #remote
+
+---
+
 ## [2026-04-16] add_freskopoints y update_streak faltaban en schema.sql
 
 **Síntoma:** Las Server Actions llamaban a `supabase.rpc('add_freskopoints', ...)` y `supabase.rpc('update_streak', ...)` pero las funciones no estaban documentadas en `supabase/schema.sql`.
