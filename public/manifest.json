@@ -4,11 +4,13 @@
   "description": "Tu despensa inteligente. Reduce desperdicio, cocina mejor.",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "orientation": "portrait",
   "categories": ["food", "lifestyle", "productivity"],
   "lang": "es",
+  "launch_handler": { "client_mode": "navigate-existing" },
   "icons": [
     {
       "src": "/icons/icon-192.svg",

@@ -133,11 +133,11 @@ Push notifications son clave para alertas de caducidad.
 - [x] PWA config (manifest + service worker — `@ducanh2912/next-pwa`)
 - [x] Auth UI (login + registro + Google OAuth + callback /auth/callback)
 - [x] Layout shell mobile-first (Header, BottomNav, AppShell)
-- [ ] CRUD productos
-- [ ] Dashboard con alertas de caducidad
-- [ ] Gamificación (FreskoPoints + rachas + badges)
-- [ ] Generador de recetas con caché SHA-256
-- [ ] OCR de tickets
+- [x] CRUD productos
+- [x] Dashboard con alertas de caducidad
+- [x] Gamificación (FreskoPoints + rachas + badges)
+- [x] Generador de recetas con caché SHA-256
+- [x] OCR de tickets
 - [ ] Stripe (checkout + webhooks + guards premium)
 - [ ] Deploy Vercel
 
@@ -165,6 +165,22 @@ El proyecto vive en **`D:\GetFresko`**. Existe una carpeta vacía en `C:\Users\u
 ---
 
 ## Contexto de sesiones anteriores
+
+### Sesión 3 — 2026-04-16
+- Generador de recetas IA completo con caché SHA-256 (`src/app/(app)/recetas/` + `src/lib/actions/recipes.ts`)
+- OCR de tickets con visión claude-haiku-4-5 (`src/app/(app)/productos/escanear/` + `src/lib/actions/tickets.ts`)
+- Estadísticas reales: FreskoPoints, rachas, badges, tasa de ahorro, barra de progreso (`src/app/(app)/estadisticas/`)
+- Funciones SQL añadidas al schema: `add_freskopoints`, `update_streak`, tabla `user_badges`
+- Streak update integrado en `updateProductStatus` action
+- **Próxima sesión:** Stripe integration (checkout + webhooks), deploy Vercel
+
+### Sesión 2 — 2026-04-13
+- PWA config + service worker (@ducanh2912/next-pwa)
+- Auth UI completa (login + registro + Google OAuth + /auth/callback)
+- Layout shell mobile-first (Header, BottomNav, AppShell)
+- CRUD productos (Server Actions + ProductCard con swipe actions)
+- Dashboard con alertas de caducidad y acciones rápidas
+- Proxy/middleware para auth guard (Next.js 16: middleware.ts → proxy.ts)
 
 ### Sesión 1 — 2026-04-07 / 2026-04-08
 - Setup completo del proyecto en `D:\GetFresko`

@@ -71,6 +71,20 @@
 
 ---
 
+## [2026-04-16] add_freskopoints y update_streak faltaban en schema.sql
+
+**Síntoma:** Las Server Actions llamaban a `supabase.rpc('add_freskopoints', ...)` y `supabase.rpc('update_streak', ...)` pero las funciones no estaban documentadas en `supabase/schema.sql`.
+
+**Causa:** Estas funciones se añadieron a la base de datos en sesión 2 vía SQL Editor de Supabase pero no se actualizó el schema.sql del repo.
+
+**Solución:** Añadir ambas funciones a `supabase/schema.sql` junto con la tabla `user_badges`. Ejecutar el bloque nuevo en el SQL Editor de Supabase si no existe.
+
+**Archivos afectados:** `supabase/schema.sql`
+
+**Tags:** #supabase #sql #gamificacion
+
+---
+
 ## [2026-04-08] VSCode abría la carpeta vacía en C: en lugar del proyecto en D:
 
 **Síntoma:** El proyecto no aparecía en VSCode — la carpeta abierta estaba vacía.

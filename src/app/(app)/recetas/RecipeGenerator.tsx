@@ -1,0 +1,221 @@
+'use client'
+
+import { useActionState, useState } from 'react'
+import { generateRecipe, type RecipeState } from '@/lib/actions/recipes'
+
+interface Product {
+  id: string
+  custom_name: string
+  expiry_date: string | null
+  location: string
+}
+
+const DIET_OPTIONS = [
+  { value: 'omnivore', label: 'Todo', emoji: '🍖' },
+  { value: 'vegetarian', label: 'Vegetariano', emoji: '🥦' },
+  { value: 'vegan', label: 'Vegano', emoji: '🌱' },
+  { value: 'glutenfree', label: 'Sin gluten', emoji: '🌾' },
+]
+
+const initial: RecipeState = { recipe: null, error: null, cached: false }
+
+export function RecipeGenerator({ products }: { products: Product[] }) {
+  const [state, action, isPending] = useActionState(generateRecipe, initial)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(products.filter(p => p.expiry_date).slice(0, 6).map(p => p.id))
+  )
+
+  function toggle(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  function daysLeft(date: string | null) {
+    if (!date) return null
+    return Math.ceil((new Date(date).getTime() - today.getTime()) / 86400000)
+  }
+
+  return (
+    <div className="px-4 py-4 space-y-5">
+      {/* Recipe result */}
+      {state.recipe && (
+        <RecipeCard recipe={state.recipe} cached={state.cached} />
+      )}
+
+      {state.error && (
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          {state.error}
+        </div>
+      )}
+
+      <form action={action} className="space-y-5">
+        {/* Hidden selected ids */}
+        {Array.from(selectedIds).map(id => (
+          <input key={id} type="hidden" name="product_ids" value={id} />
+        ))}
+
+        {/* Diet type */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-2">Dieta</p>
+          <div className="grid grid-cols-4 gap-2">
+            {DIET_OPTIONS.map(opt => (
+              <label key={opt.value} className="cursor-pointer">
+                <input type="radio" name="diet_type" value={opt.value} defaultChecked={opt.value === 'omnivore'} className="peer sr-only" />
+                <div className="flex flex-col items-center rounded-xl border-2 border-gray-200 py-2.5 text-xs font-medium text-gray-500 transition peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700">
+                  <span className="text-lg">{opt.emoji}</span>
+                  <span className="mt-0.5 leading-tight text-center">{opt.label}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Ingredient selector */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-2">
+            Ingredientes ({selectedIds.size} seleccionados)
+          </p>
+          {products.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
+              Tu despensa está vacía. Añade productos primero.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {products.map(p => {
+                const days = daysLeft(p.expiry_date)
+                const isUrgent = days !== null && days <= 2
+                const isChecked = selectedIds.has(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => toggle(p.id)}
+                    className={`w-full flex items-center justify-between rounded-xl border-2 px-4 py-2.5 text-left transition ${
+                      isChecked
+                        ? 'border-green-400 bg-green-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                        isChecked ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                      }`}>
+                        {isChecked && (
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <polyline points="1.5,5 4,7.5 8.5,2" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </span>
+                      <span className="text-sm text-gray-900">{p.custom_name}</span>
+                    </div>
+                    {days !== null && (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        isUrgent ? 'bg-red-50 text-red-600' :
+                        days <= 5 ? 'bg-orange-50 text-orange-600' :
+                        'bg-gray-50 text-gray-400'
+                      }`}>
+                        {days === 0 ? 'hoy' : days === 1 ? 'mañana' : `${days}d`}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={isPending || selectedIds.size === 0}
+          className="w-full rounded-xl bg-green-600 px-4 py-3.5 text-sm font-semibold text-white shadow transition hover:bg-green-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isPending ? (
+            <>
+              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z"/>
+              </svg>
+              Generando receta...
+            </>
+          ) : (
+            <>👨‍🍳 Generar receta +{5}⭐</>
+          )}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function RecipeCard({ recipe, cached }: { recipe: NonNullable<RecipeState['recipe']>; cached: boolean }) {
+  const difficultyColor = {
+    'fácil': 'bg-green-50 text-green-700',
+    'media': 'bg-orange-50 text-orange-700',
+    'difícil': 'bg-red-50 text-red-700',
+  }[recipe.difficulty] ?? 'bg-gray-50 text-gray-700'
+
+  return (
+    <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-4 text-white">
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-base font-bold leading-tight">{recipe.title}</h2>
+          {cached && (
+            <span className="shrink-0 text-[10px] bg-white/20 rounded-full px-2 py-0.5">
+              de caché
+            </span>
+          )}
+        </div>
+        <div className="flex gap-3 mt-2 text-xs text-green-100">
+          <span>🍽️ {recipe.servings} personas</span>
+          <span>⏱️ {recipe.prepTime} min</span>
+          <span className={`rounded-full px-2 py-0.5 ${difficultyColor} text-xs font-medium`}>
+            {recipe.difficulty}
+          </span>
+        </div>
+      </div>
+
+      <div className="px-4 py-4 space-y-4">
+        {/* Ingredients */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-2">Ingredientes</p>
+          <ul className="space-y-1">
+            {recipe.ingredients.map((ing, i) => (
+              <li key={i} className="flex gap-2 text-sm text-gray-700">
+                <span className="text-gray-300">•</span>
+                <span><strong>{ing.amount}</strong> {ing.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Steps */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-2">Pasos</p>
+          <ol className="space-y-2">
+            {recipe.steps.map((step, i) => (
+              <li key={i} className="flex gap-3 text-sm text-gray-700">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center">
+                  {i + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {/* Tips */}
+        {recipe.tips && (
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-3 text-xs text-amber-800">
+            <span className="font-semibold">Tip: </span>{recipe.tips}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

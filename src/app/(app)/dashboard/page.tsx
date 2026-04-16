@@ -6,33 +6,32 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Productos próximos a caducar (≤5 días)
   const today = new Date()
   const in5Days = new Date(today)
   in5Days.setDate(today.getDate() + 5)
 
-  const { data: expiringProducts } = await supabase
-    .from('user_products')
-    .select('*')
-    .eq('user_id', user!.id)
-    .eq('status', 'active')
-    .not('expiry_date', 'is', null)
-    .lte('expiry_date', in5Days.toISOString().split('T')[0])
-    .order('expiry_date', { ascending: true })
-    .limit(5)
-
-  const { count: totalProducts } = await supabase
-    .from('user_products')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-    .eq('status', 'active')
-
-  // Puntos del usuario
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('freskopoints, current_streak')
-    .eq('id', user!.id)
-    .single()
+  const [{ data: expiringProducts }, { count: totalProducts }, { data: profile }] =
+    await Promise.all([
+      supabase
+        .from('user_products')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('status', 'active')
+        .not('expiry_date', 'is', null)
+        .lte('expiry_date', in5Days.toISOString().split('T')[0])
+        .order('expiry_date', { ascending: true })
+        .limit(5),
+      supabase
+        .from('user_products')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .eq('status', 'active'),
+      supabase
+        .from('profiles')
+        .select('freskopoints, current_streak')
+        .eq('id', user!.id)
+        .single(),
+    ])
 
   return (
     <>
